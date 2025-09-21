@@ -1,4 +1,4 @@
 QT += opengl gui
-TARGET = contour_plot
+TARGET = plot_mesh
 TEMPLATE = app
 SOURCES = main.cpp

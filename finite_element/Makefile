@@ -1,13 +1,13 @@
-# Nombre del programa
-PROGRAMA = fem_poisson
+#
+# TransFig makefile
+#
 
-# Compilador
-COMPILADOR = gcc
+all: mesh.epic 
 
-# Regla para compilar
-all:
-	$(COMPILADOR) main.cpp -o $(PROGRAMA) -lm
+# translation into epic
 
-# Regla para limpiar
-clean:
-	rm -f $(PROGRAMA)
+mesh.tex: mesh.fig Makefile
+	fig2dev -L epic mesh.fig mesh.tex
+clean::
+	rm -f mesh.epic
+

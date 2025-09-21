@@ -9,15 +9,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <GL/gl.h>
-
-void convert2Engf(float z,float *z1,int *n);
-
-char * newstr(int N)
-{
-  return (char*) malloc((N)*sizeof(char) );
-}
-
-
+#include <util.h>
 double function_f(double x, double y) {
     return cos(1/x * 1/y);
 }
@@ -148,7 +140,7 @@ int read_triangles(const char* filename, Triangle** triangles, int* num_triangle
 
 class GLWidget : public QGLWidget, protected QGLFunctions {
 public:
-    GLWidget(QWidget *parent = NULL, char *file_1 = NULL, char *file_2 = NULL) : QGLWidget(parent) {
+    GLWidget(QWidget *parent = NULL, char *file = NULL) : QGLWidget(parent) {
         xRot = 0;
         yRot = 0;
         zRot = 0;
@@ -156,17 +148,13 @@ public:
         yTrans = 0;
         zTrans = -10.0;
         scale = 1.0;
-        x1 = -0.2;
-        x2 = 1.1;
-        y1 = -0.2;
-        y2 = 1.1;
+        x1 = -2;
+        x2 = 2;
+        y1 = -2;
+        y2 = 2;
 
-        file_name_1 = newstr(200);
-        strcpy(file_name_1, file_1 ? file_1 : "");
-
-
-        file_name_2 = newstr(200);
-        strcpy(file_name_2, file_2 ? file_2 : "");
+        file_name = newstr(200);
+        strcpy(file_name, file ? file : "");
 
         nodes = NULL;
         num_nodes = 0;
@@ -175,7 +163,7 @@ public:
         f_val = NULL;
 
         // Leer datos y calcular valores de la función
-        read_data(file_name_1,file_name_2);
+        read_data("node_f.dat", "example.e");
         fprintf(stderr,"Here ok %d\n", num_nodes);
         if (num_nodes > 0) {
             f_val = new_double(num_nodes);
@@ -193,8 +181,7 @@ public:
         if (nodes) free(nodes);
         if (triangles) free(triangles);
         if (f_val) free(f_val);
-        if (file_name_1) free(file_name_1);
-        if (file_name_2) free(file_name_2);
+        if (file_name) free(file_name);
     }
 
     void read_data(const char* nodes_filename, const char* triangles_filename) {
@@ -225,8 +212,7 @@ protected:
     float xTrans, yTrans, zTrans;
     float scale;
     float xRot, yRot, zRot;
-    char *file_name_1;
-    char *file_name_2;
+    char *file_name;
 
     void initializeGL() {
         initializeGLFunctions();
@@ -254,7 +240,7 @@ protected:
         FontSmall.setPointSize(7);
         QString snum;
         snum.setNum(num, 'e', 1);
-        renderText(x, y, 0, snum, FontSmall);
+        renderText(x, y, 0, snum, FontSmall, 2000);
     }
 
     void axis() {
@@ -343,31 +329,29 @@ protected:
                 glVertex2f(nodes[v3].x, nodes[v3].y);
             }
             glEnd();
-				if(0){
+
             // Dibujar la malla con líneas
-		         glDisable(GL_POLYGON_OFFSET_FILL);
-		         glColor3f(0.0f, 0.0f, 0.0f);
-		         glBegin(GL_LINES);
-		         for (int i = 0; i < num_triangles; i++) {
-		             int v1 = triangles[i].v1 - 1;
-		             int v2 = triangles[i].v2 - 1;
-		             int v3 = triangles[i].v3 - 1;
+            glDisable(GL_POLYGON_OFFSET_FILL);
+            glColor3f(0.0f, 0.0f, 0.0f);
+            glBegin(GL_LINES);
+            for (int i = 0; i < num_triangles; i++) {
+                int v1 = triangles[i].v1 - 1;
+                int v2 = triangles[i].v2 - 1;
+                int v3 = triangles[i].v3 - 1;
 
-		             glVertex2f(nodes[v1].x, nodes[v1].y);
-		             glVertex2f(nodes[v2].x, nodes[v2].y);
-		             glVertex2f(nodes[v2].x, nodes[v2].y);
-		             glVertex2f(nodes[v3].x, nodes[v3].y);
-		             glVertex2f(nodes[v3].x, nodes[v3].y);
-		             glVertex2f(nodes[v1].x, nodes[v1].y);
-		         }
-		         glEnd();
+                glVertex2f(nodes[v1].x, nodes[v1].y);
+                glVertex2f(nodes[v2].x, nodes[v2].y);
+                glVertex2f(nodes[v2].x, nodes[v2].y);
+                glVertex2f(nodes[v3].x, nodes[v3].y);
+                glVertex2f(nodes[v3].x, nodes[v3].y);
+                glVertex2f(nodes[v1].x, nodes[v1].y);
+            }
+            glEnd();
 
-		         // Dibujar nodos como círculos
-		         glColor3f(0.0f, 0.0f, 0.0f);
-		         for (int i = 0; i < num_nodes; i++) {
-		             circle(nodes[i].x, nodes[i].y, 0.03);
-		         }
-
+            // Dibujar nodos como círculos
+            glColor3f(0.0f, 0.0f, 0.0f);
+            for (int i = 0; i < num_nodes; i++) {
+                circle(nodes[i].x, nodes[i].y, 0.03);
             }
         }
 
@@ -433,73 +417,36 @@ protected:
 class MainWindow : public QWidget {
     Q_OBJECT
 public:
-    MainWindow(QWidget *parent = NULL,char * file_1 = NULL,char * file_2 = NULL) : QWidget(parent) {
+    MainWindow(QWidget *parent = NULL,char * file = NULL) : QWidget(parent) {
         // Layout y botón
-		  file_name_1 = newstr(200);
-        strcpy(file_name_1,file_1); 
-		  file_name_2 = newstr(200);
-        strcpy(file_name_2,file_2); 
-
+		  file_name = newstr(200);
+        strcpy(file_name,file); 
         QVBoxLayout *layout = new QVBoxLayout(this);
-        GLWidget *glWidget = new GLWidget(this, file_name_1, file_name_2);
-        glWidget->setMinimumSize(500, 500);
+        GLWidget *glWidget = new GLWidget(this, file_name);
+        glWidget->setMinimumSize(400, 400);
 
         layout->addWidget(glWidget);
 
     }
 
     ~MainWindow() {
-        if (file_name_1) free(file_name_1);
-        if (file_name_2) free(file_name_2);
+        if (file_name) free(file_name);
     }
 
 public slots:
 
 
 private:
-    char *file_name_1;
-    char *file_name_2;
+    char *file_name;
 };
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
-    MainWindow mainWindow(NULL,argv[1],argv[2]);
+    MainWindow mainWindow(NULL,argv[1]);
     mainWindow.setWindowTitle("OpenGL + Botón en Qt4");
-    mainWindow.resize(500, 500);
+    mainWindow.resize(400, 500);
     mainWindow.show();
     return app.exec();
 }
-
-
-void convert2Engf(float z,float *z1,int *n)
-{
-	
-   double zt=z;
-   int nexp=0;
-       		 
-   if(fabs(z)>10)
-   {
-   	  zt=z;
-      do
-	  {
-		 zt=zt/10;
-		 nexp++;
-	   }while(fabs(zt)>10);
-	   
-  	}
-    if(fabs(z)<1)
-    {
-   	  zt=z;
-      do
-	  {
-		 zt=zt*10;
-		 nexp--;		 
-	   }while(fabs(zt)<1);
-	   
-  	}
-   *z1=zt;
-   *n=nexp;  	  	     
-}
-
 
 #include "main.moc"
