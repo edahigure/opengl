@@ -1,8 +1,43 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <limits.h>
+
+
 
 #define TINY 1.0e-20
+
+typedef struct {
+    int Id;
+    double x, y;
+    int mark;
+} Node;
+
+typedef struct {
+    int Id;
+    int i, j, k;
+    int ei, ej, ek;
+    int si, sj, sk;
+    double xv, yv;
+    int material;
+} Element;
+
+typedef struct {
+    int Id;
+    int a, b, c, d;
+    int ea, eb;
+    int mark;
+    double s;
+} Side;
+
+// VARIABLES GLOBALES (añadir 'extern')
+ Node* nod;
+ Element* ele; 
+ Side* sides;
+ int Nn, Ne, Ns;
+ double f_min, f_max;
+
 
 // Funciones de asignación de memoria
 double* new_double(int N) {
@@ -21,6 +56,10 @@ int* new_int(int N) {
         exit(EXIT_FAILURE);
     }
     return ptr;
+}
+
+char* newstr(int N) {
+    return (char*)malloc(N * sizeof(char));
 }
 
 double **new_matrix_double(int nrh, int nch) {
@@ -49,22 +88,8 @@ void free_matrix_double(double **m) {
     }
 }
 
-typedef struct {
-    int Id;
-    int i, j, k;
-    int ei, ej, ek;
-    int si, sj, sk;
-    double xV, yV;
-} ELEMENT;
-
-typedef struct {
-    int Id;
-    double x, y;
-    int mark;
-} NODE;
-
-ELEMENT* new_element(int N) {
-    ELEMENT *elem = (ELEMENT*)calloc(N, sizeof(ELEMENT));
+Element* new_element(int N) {
+    Element *elem = (Element*)calloc(N, sizeof(Element));
     if (!elem) {
         fprintf(stderr, "Error: Cannot allocate %d elements\n", N);
         return NULL;
@@ -72,8 +97,8 @@ ELEMENT* new_element(int N) {
     return elem;
 }
 
-NODE* new_node(int N) {
-    NODE *nodes = (NODE*)calloc(N, sizeof(NODE));
+Node* new_node(int N) {
+    Node *nodes = (Node*)calloc(N, sizeof(Node));
     if (!nodes) {
         fprintf(stderr, "Error: Cannot allocate %d nodes\n", N);
         return NULL;
@@ -81,20 +106,18 @@ NODE* new_node(int N) {
     return nodes;
 }
 
-void free_element(ELEMENT *elem) {
+void free_element(Element *elem) {
     if (elem) free(elem);
 }
 
-void free_node(NODE *node_ptr) {
+void free_node(Node *node_ptr) {
     if (node_ptr) free(node_ptr);
 }
 
-int Ne = 0, Nn = 0;
-ELEMENT *ele = NULL;
-NODE *nod = NULL;
 double **K = NULL;
 double *F = NULL;
 double *FF = NULL;
+
 
 void applyBoundaryConditions(void) {
     for (int i = 0; i < Nn; i++) {
@@ -116,9 +139,16 @@ void getK(void) {
     double KK[3][3];
 
     for (int J = 0; J < Ne; J++) {
-        nodes[0] = ele[J].i - 1;
-        nodes[1] = ele[J].j - 1;
-        nodes[2] = ele[J].k - 1;
+        // Usar find_node_index para manejar cualquier convención de índices
+        nodes[0] = ele[J].i;
+        nodes[1] = ele[J].j;
+        nodes[2] = ele[J].k;
+        
+        // Verificar que los índices sean válidos
+        if (nodes[0] == -1 || nodes[1] == -1 || nodes[2] == -1) {
+            fprintf(stderr, "Error: Invalid node reference in element %d\n", J);
+            continue;
+        }
         
         x[0] = nod[nodes[0]].x; y[0] = nod[nodes[0]].y;
         x[1] = nod[nodes[1]].x; y[1] = nod[nodes[1]].y;
@@ -136,6 +166,8 @@ void getK(void) {
             }
         }
 
+        fprintf(stderr, "Processing element %d\n", J);
+
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
                 K[nodes[i]][nodes[j]] += KK[i][j];
@@ -150,17 +182,24 @@ void getF(void) {
     }
     
     for (int J = 0; J < Ne; J++) {
-        int i = ele[J].i - 1, j = ele[J].j - 1, k = ele[J].k - 1;
+        int i_idx = ele[J].i;
+        int j_idx = ele[J].j;
+        int k_idx = ele[J].k;
         
-        double xi = nod[i].x, yi = nod[i].y;
-        double xj = nod[j].x, yj = nod[j].y;
-        double xk = nod[k].x, yk = nod[k].y;
+        if (i_idx == -1 || j_idx == -1 || k_idx == -1) {
+            fprintf(stderr, "Error: Invalid node reference in element %d for getF\n", J);
+            continue;
+        }
+        
+        double xi = nod[i_idx].x, yi = nod[i_idx].y;
+        double xj = nod[j_idx].x, yj = nod[j_idx].y;
+        double xk = nod[k_idx].x, yk = nod[k_idx].y;
         
         double Ae = 0.5 * fabs((xj*yk - xk*yj) - xi*(yk - yj) + yi*(xk - xj));
         
-        FF[i] += Ae * (2.0 * F[i] + F[j] + F[k]) / 12.0;
-        FF[j] += Ae * (F[i] + 2.0 * F[j] + F[k]) / 12.0;
-        FF[k] += Ae * (F[i] + F[j] + 2.0 * F[k]) / 12.0;
+        FF[i_idx] += Ae * (2.0 * F[i_idx] + F[j_idx] + F[k_idx]) / 12.0;
+        FF[j_idx] += Ae * (F[i_idx] + 2.0 * F[j_idx] + F[k_idx]) / 12.0;
+        FF[k_idx] += Ae * (F[i_idx] + F[j_idx] + 2.0 * F[k_idx]) / 12.0;
     }
 }
 
@@ -256,34 +295,65 @@ void lubksb(double **a, int n, int *indx, double b[]) {
 }
 
 int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <base_filename>\n", argv[0]);
+        return 1;
+    }
+
     FILE *fd;
-    
-    // 1. Leer malla
-    fd = fopen("example.e", "r");
+    char *base_name;
+    char *file_e;
+    char *file_n;
+
+    base_name = newstr(200);
+    file_e = newstr(200);
+    file_n = newstr(200);
+
+    strcpy(base_name, argv[1]);
+    snprintf(file_e, 200, "%s.e", base_name);
+    snprintf(file_n, 200, "%s.n", base_name);
+
+    fprintf(stderr, "Base name: %s\n", base_name);
+
+    // 1. Leer malla de elementos
+    fd = fopen(file_e, "r");
     if (!fd) {
-        fprintf(stderr, "Error: Cannot open example.e\n");
+        fprintf(stderr, "Error: Cannot open %s\n", file_e);
         return 1;
     }
-    fscanf(fd, "%d\n", &Ne);
+    fscanf(fd, "%d", &Ne);
+    
+
     ele = new_element(Ne);
-    for (int k = 0; k < Ne; k++) {
-        fscanf(fd, "%d %d %d %d\n", &ele[k].Id, &ele[k].i, &ele[k].j, &ele[k].k);
+
+    for (int i = 0; i < Ne; i++) {
+     
+        fscanf(fd, "%d %d %d %d %d %d %d %d %d %d %lf %lf %d",
+              &ele[i].Id, &ele[i].i, &ele[i].j, &ele[i].k,
+              &ele[i].ei, &ele[i].ej, &ele[i].ek,
+              &ele[i].si, &ele[i].sj, &ele[i].sk,
+              &ele[i].xv, &ele[i].yv, &ele[i].material);
     }
+
     fclose(fd);
-    
-    fd = fopen("example.n", "r");
+
+    // 2. Leer malla de nodos
+    fd = fopen(file_n, "r");
     if (!fd) {
-        fprintf(stderr, "Error: Cannot open example.n\n");
+        fprintf(stderr, "Error: Cannot open %s\n", file_n);
         return 1;
     }
-    fscanf(fd, "%d\n", &Nn);
+    fscanf(fd, "%d", &Nn);
+
     nod = new_node(Nn);
     for (int k = 0; k < Nn; k++) {
-        fscanf(fd, "%d %lf %lf %d\n", &nod[k].Id, &nod[k].x, &nod[k].y, &nod[k].mark);
+        fscanf(fd, "%d %lf %lf %d", &nod[k].Id, &nod[k].x, &nod[k].y, &nod[k].mark);
     }
     fclose(fd);
-    
-    // 2. Inicializar matrices
+
+
+
+    // 3. Inicializar matrices
     K = new_matrix_double(Nn, Nn);
     F = new_double(Nn);
     FF = new_double(Nn);
@@ -295,15 +365,20 @@ int main(int argc, char *argv[]) {
             K[k][i] = 0.0;
         }
     }
-    
-    // 3. Ensamblar sistema
+
+    // 4. Ensamblar sistema
+    fprintf(stderr, "Assembling K matrix...\n");
     getK();
+
+    fprintf(stderr, "Assembling F vector...\n");
     getF();
-    
-    // 4. Aplicar condiciones de frontera
+
+    // 5. Aplicar condiciones de frontera
+    fprintf(stderr, "Applying boundary conditions...\n");
     applyBoundaryConditions();
     
-    // 5. Resolver sistema
+    // 6. Resolver sistema
+    fprintf(stderr, "Solving system...\n");
     int *indx = new_int(Nn);
     double det;
     double **K_copy = new_matrix_double(Nn, Nn);
@@ -321,19 +396,21 @@ int main(int argc, char *argv[]) {
     ludcmp(K_copy, Nn, indx, &det);
     lubksb(K_copy, Nn, indx, solution);
     
-    // 6. Imprimir resultados
-    FILE *fd_out = fopen("node_f.dat", "w");
+    // 7. Imprimir resultados
+    FILE *fd_out = fopen(file_n, "w");
     if (!fd_out) {
         fprintf(stderr, "Error: Cannot open node_f.dat\n");
         return 1;
     }
     fprintf(fd_out, "%d\n", Nn);
     for (int i = 0; i < Nn; i++) {
-        fprintf(fd_out, "%d %.6f %.6f %d %.6f\n", nod[i].Id, nod[i].x, nod[i].y, nod[i].mark, solution[i]);
+        fprintf(fd_out, "%4d  %18.15e %18.15e  %d %18.15e\n", 
+                nod[i].Id, nod[i].x, nod[i].y, nod[i].mark, solution[i]);
+
     }
     fclose(fd_out);
     
-    // 7. Liberar memoria
+    // 8. Liberar memoria
     free_matrix_double(K_copy);
     free(indx);
     free(solution);
@@ -342,6 +419,10 @@ int main(int argc, char *argv[]) {
     free(FF);
     free_element(ele);
     free_node(nod);
+    free(base_name);
+    free(file_e);
+    free(file_n);
     
+    fprintf(stderr, "Program completed successfully.\n");
     return 0;
 }

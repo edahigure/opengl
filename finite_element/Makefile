@@ -1,13 +1,7 @@
-#
-# TransFig makefile
-#
 
-all: mesh.epic 
 
-# translation into epic
+all: FEM_main.c easymesh.c
+	gcc easymesh.c  -o easymesh -lm
+	gcc FEM_main.c  -o fem_program -lm
 
-mesh.tex: mesh.fig Makefile
-	fig2dev -L epic mesh.fig mesh.tex
-clean::
-	rm -f mesh.epic
 
