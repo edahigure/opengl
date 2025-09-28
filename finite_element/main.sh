@@ -1,5 +1,8 @@
+#!/bin/bash
 
-./easymesh cuadrado
-./fem_program cuadrado
-./contour_plot cuadrado.n cuadrado.e
-
+file=$1
+./easymesh $file
+./fem_program cuadrado $file
+./contour_plot $file.n $file.e &
+./mesh_plot $file &
+wait
